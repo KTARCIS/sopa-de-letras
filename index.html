@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sopa de Letras – TECNEC</title>
+  <style>
+    :root {
+      --bg: #0f172a;         /* slate-900 */
+      --panel: #111827;      /* gray-900 */
+      --muted: #1f2937;      /* gray-800 */
+      --text: #e5e7eb;       /* gray-200 */
+      --accent: #22c55e;     /* green-500 */
+      --accent-2: #60a5fa;   /* blue-400 */
+      --warn: #f59e0b;       /* amber-500 */
+      --danger: #ef4444;     /* red-500 */
+      --found: #34d399;      /* emerald-400 */
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji"; background: radial-gradient(1200px 800px at 10% 10%, #0b1224, var(--bg)); color: var(--text); }
+
+    header {
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: blur(8px);
+      background: color-mix(in oklab, var(--bg) 85%, transparent);
+      border-bottom: 1px solid #1f2937;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    h1 { font-size: clamp(20px, 2.2vw, 28px); margin: 0 0 6px; letter-spacing: 0.5px; }
+    .sub { opacity: .8; font-size: 13px; }
+
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+    .control {
+      display: inline-flex; align-items: center; gap: 8px; background: var(--panel);
+      border: 1px solid var(--muted); padding: 8px 10px; border-radius: 14px; font-size: 14px;
+    }
+    select, button { background: transparent; color: var(--text); border: none; font-size: 14px; }
+    select { padding-right: 4px; }
+    button.btn {
+      background: linear-gradient(180deg, #1f2937, #0b1224);
+      border: 1px solid #263244; border-radius: 14px; padding: 10px 14px; cursor: pointer; transition: transform .06s ease, box-shadow .2s;
+    }
+    button.btn:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -12px rgba(0,0,0,.6); }
+    button.primary { border-color: #1f6b3e; background: linear-gradient(180deg, #14532d, #0b3b21); }
+    button.secondary { border-color: #1d4ed8; background: linear-gradient(180deg, #1e3a8a, #0b1a4a); }
+
+    main { max-width: 1100px; margin: 18px auto 40px; padding: 0 16px; }
+    .layout { display: grid; grid-template-columns: 1fr minmax(240px, 300px); gap: 18px; }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    /* Board */
+    #board {
+      user-select: none; touch-action: none;
+      display: grid; gap: 4px; padding: 14px;
+      background: linear-gradient(180deg, #0c1222, #0a0f1c);
+      border: 1px solid var(--muted); border-radius: 16px;
+    }
+
+    .cell { 
+      width: clamp(28px, 6.5vw, 44px); height: clamp(28px, 6.5vw, 44px);
+      display: grid; place-items: center; font-weight: 700; letter-spacing: 0.5px;
+      background: #0e1729; border: 1px solid #1b2740; border-radius: 8px;
+      transition: background .08s, transform .02s;
+    }
+    .cell:hover { background: #0f1c35; }
+    .cell.found { background: #083a2e; border-color: #0f513f; color: #befae0; }
+
+    /* Animación de selección */
+    @keyframes pulseSelect {
+      0% { transform: scale(1); background-color: #0d2240; }
+      50% { transform: scale(1.15); background-color: #1e3a8a; }
+      100% { transform: scale(1); background-color: #0d2240; }
+    }
+    .cell.preview, .cell.active {
+      animation: pulseSelect 0.28s ease-in-out;
+      background-color: #0d2240 !important;
+      border-color: var(--accent-2);
+    }
+
+    /* === ADICIÓN: Animación de error === */
+    @keyframes wrongSelect {
+      0% { background-color: #0d2240; }
+      25% { background-color: #7f1d1d; }
+      50% { background-color: #dc2626; }
+      75% { background-color: #7f1d1d; }
+      100% { background-color: #0d2240; }
+    }
+    .cell.error { animation: wrongSelect 0.4s ease-in-out; }
+
+    /* === ADICIÓN: Animación de victoria === */
+    @keyframes victory {
+      0%,100% { transform: scale(1); background-color: #0d2240; }
+      50% { transform: scale(1.25); background-color: var(--accent); color: #000; }
+    }
+    .cell.victory { animation: victory 0.5s ease-in-out; }
+
+    /* Sidebar */
+    aside {
+      background: linear-gradient(180deg, #0b121f, #0a0f1a);
+      border: 1px solid var(--muted); border-radius: 16px; padding: 14px; height: fit-content;
+    }
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-bottom: 12px; }
+    .stat { background: #0e1729; border: 1px solid #1b2740; border-radius: 12px; padding: 10px; text-align: center; }
+    .stat .k { font-size: 11px; opacity: .8; }
+    .stat .v { font-size: 18px; font-weight: 800; margin-top: 2px; }
+
+    .wordlist { margin-top: 6px; display: grid; gap: 6px; }
+    .chip {
+      display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px;
+      background: #0e1729; border: 1px solid #1b2740; border-radius: 999px; font-size: 14px;
+    }
+    .chip.done { background: #052e24; border-color: #0f4d3b; opacity: .85; text-decoration: line-through; }
+
+    .hint { font-size: 12px; opacity: .8; margin-top: 10px; }
+
+    .footer { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .badge { font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid #22314c; background: #0c1527; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="row" style="justify-content: space-between; align-items: flex-end;">
+        <div>
+          <h1>🧩 Sopa de Letras - CIBERSEGURIDAD</h1>
+          <div class="sub">Toca y arrastra (móvil) o clic y arrastra (PC) para seleccionar palabras en línea recta. Ocho direcciones válidas.</div>
+        </div>
+        <div class="controls">
+          <div class="control">
+            <label for="difficulty">Dificultad:</label>
+            <select id="difficulty" aria-label="Selecciona dificultad">
+              <option value="10">Fácil (10×10)</option>
+              <option value="12" selected>Media (12×12)</option>
+              <option value="14">Difícil (14×14)</option>
+            </select>
+          </div>
+          <div class="control">
+            <label for="category">Categoría:</label>
+            <select id="category" aria-label="Selecciona categoría">
+              <option value="tech" selected>Tecnología</option>
+              <option value="animales">Animales</option>
+              <option value="paises">Países</option>
+              <option value="ciberseguridad">Ciberseguridad</option>
+              <option value="random">Aleatoria</option>
+            </select>
+          </div>
+          <button id="btn-new" class="btn primary">🔄 Nuevo juego</button>
+          <button id="btn-toggle" class="btn secondary">📜 Ocultar lista</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="layout">
+      <section>
+        <div id="board" aria-label="Tablero de sopa de letras"></div>
+      </section>
+      <aside>
+        <div class="stats">
+          <div class="stat"><div class="k">Tiempo</div><div class="v" id="time">00:00</div></div>
+          <div class="stat"><div class="k">Encontradas</div><div class="v" id="found">0</div></div>
+          <div class="stat"><div class="k">Total</div><div class="v" id="total">0</div></div>
+        </div>
+        <strong>Palabras</strong>
+        <div id="list" class="wordlist"></div>
+        <div class="hint">Consejo: puedes seleccionar también en diagonal y al revés.</div>
+        <div class="footer">
+          <span class="badge">8 direcciones</span>
+          <span class="badge">Responsive</span>
+          <span class="badge">Sin librerías</span>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    // ======= Banco de palabras (en MAYÚSCULAS, sin acentos) =======
+    const WORD_BANK = {
+      tech: [
+        "TECLADO","MOUSE","MONITOR","PROCESADOR","MEMORIA","DISCO","SSD","GRAFICA","CHIPSET","PLACA","PUERTO","USB","ETHERNET","WIFI","BLUETOOTH","BATERIA","ROUTER","SERVIDOR","LAPTOP","NUBE","BACKUP","ALGORITMO","CODIGO","SOFTWARE","HARDWARE","PANTALLA","PIXEL","BIOS","FIRMWARE","LINUX","WINDOWS","ANDROID","LATENCIA","ANALOGICO","DIGITAL","SENSOR","GPU","CPU","VENTILADOR","PASTA","TERMICA","ENSAMBLE","DRIVER","KERNEL","CONSOLA","CABLE","REDES","DATOS","SEGURIDAD","FIBRA","OPTICA","ARQUITECTURA","SOLDADURA","DIAGNOSTICO"
+      ],
+      animales: [
+        "PERRO","GATO","LEON","TIGRE","ELEFANTE","JIRAFA","RINOCERONTE","CEBRA","MONO","LOBO","ZORRO","OSO","BALLENA","DELFIN","AGUILA","CONDOR","RANA","SERPIENTE","CONEJO","CABALLO","VACA","OVEJA","PAVO","GALLINA","TORTUGA","PINGUINO","KOALA","PANDA","HIPOPOTAMO","CAMELLO"
+      ],
+      paises: [
+        "COLOMBIA","ARGENTINA","PERU","CHILE","MEXICO","BRASIL","URUGUAY","PARAGUAY","ECUADOR","BOLIVIA","VENEZUELA","PANAMA","COSTARICA","NICARAGUA","HONDURAS","ELSALVADOR","GUATEMALA","ESPAÑA","PORTUGAL","FRANCIA","ALEMANIA","ITALIA","SUIZA","SUECIA","NORUEGA","FINLANDIA","ISLANDIA","JAPON","CHINA","COREA","INDIA","CANADA","ESTADOSUNIDOS","AUSTRALIA","NUEVAZELANDA","MARRUECOS","EGIPTO","SUDÁFRICA".replace("Á","A")
+      ],
+      // NUEVA CATEGORÍA: palabras básicas (una sola línea)
+      ciberseguridad: ["SEGURIDAD","CONTRASENA","FIREWALL","VIRUS","HACKER","VPN","TICS","DATOS","RED","USUARIO","PROTECCION","CUENTA","ANTIVIRUZ","CONFIDENCIALIDAD","SERVIDOR","BACKUP",]
+    };
+
+    // Si category = random, combinamos varios
+    function getWordPool(category) {
+      if (category === 'random') {
+        const all = [...WORD_BANK.tech, ...WORD_BANK.animales, ...WORD_BANK.paises, ...WORD_BANK.ciberseguridad];
+        return shuffle(all);
+      }
+      return WORD_BANK[category] || WORD_BANK.tech;
+    }
+
+    // ======= Utilidades =======
+    const ABC = "A,B,C,D,E,F,G,H,I,J,K,L,M,N,Ñ,O,P,Q,R,S,T,U,V,W,X,Y,Z".split(',');
+    const DIRS = [
+      [0,1], [1,0], [0,-1], [-1,0], // rectas
+      [1,1], [1,-1], [-1,1], [-1,-1] // diagonales
+    ];
+
+    function shuffle(arr){ return arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(v=>v[1]); }
+    function pad(n){ return n.toString().padStart(2,'0'); }
+
+    // ======= Estado =======
+    let size = 12;
+    let placedWords = []; // {word, path:[{r,c}]}
+    let foundSet = new Set();
+    let grid = []; // matriz de letras
+    let timerInt = null, seconds = 0;
+    let selecting = false, startCell = null, currentPath = [];
+
+    // ======= DOM =======
+    const board = document.getElementById('board');
+    const list = document.getElementById('list');
+    const foundEl = document.getElementById('found');
+    const totalEl = document.getElementById('total');
+    const timeEl = document.getElementById('time');
+    const btnNew = document.getElementById('btn-new');
+    const btnToggle = document.getElementById('btn-toggle');
+    const selDiff = document.getElementById('difficulty');
+    const selCat = document.getElementById('category');
+
+    // ======= Inicial =======
+    selDiff.addEventListener('change', () => { size = parseInt(selDiff.value,10); newGame(); });
+    selCat.addEventListener('change', newGame);
+    btnNew.addEventListener('click', newGame);
+    btnToggle.addEventListener('click', () => {
+      const hidden = list.style.display === 'none';
+      list.style.display = hidden ? '' : 'none';
+      btnToggle.textContent = hidden ? '📜 Ocultar lista' : '📜 Mostrar lista';
+    });
+
+    function startTimer(){ clearInterval(timerInt); seconds = 0; timeEl.textContent = '00:00'; timerInt = setInterval(()=>{ seconds++; const m=Math.floor(seconds/60), s=seconds%60; timeEl.textContent = `${pad(m)}:${pad(s)}`; }, 1000); }
+
+    function newGame(){
+      const pool = getWordPool(selCat.value);
+      const chosen = shuffle(pool).slice(0, 10).map(w => normalize(w)); // SIEMPRE 10 PALABRAS
+      buildGrid(size, chosen);
+      renderBoard();
+      renderList();
+      startTimer();
+    }
+
+    function normalize(w){
+      return w.toUpperCase()
+        .replaceAll('Á','A').replaceAll('É','E').replaceAll('Í','I').replaceAll('Ó','O').replaceAll('Ú','U')
+        .replaceAll('Ü','U');
+    }
+
+    function buildGrid(n, words){
+      grid = Array.from({length: n}, () => Array.from({length:n}, ()=>''));
+      placedWords = [];
+      foundSet = new Set();
+
+      // Colocar palabras
+      for (const word of words) {
+        placeWord(word, n);
+      }
+
+      // Rellenar vacíos
+      for (let r=0; r<n; r++){
+        for (let c=0; c<n; c++){
+          if (!grid[r][c]) grid[r][c] = ABC[Math.floor(Math.random()*ABC.length)];
+        }
+      }
+    }
+
+    function canPlace(word, r, c, dr, dc, n){
+      const L = word.length;
+      const endR = r + dr*(L-1), endC = c + dc*(L-1);
+      if (endR < 0 || endR >= n || endC < 0 || endC >= n) return false;
+      for (let i=0;i<L;i++){
+        const rr = r + dr*i, cc = c + dc*i;
+        const ch = grid[rr][cc];
+        if (ch && ch !== word[i]) return false; // permite solapar con misma letra
+      }
+      return true;
+    }
+
+    function placeWord(word, n){
+      const tries = 800; // ↑ más intentos para aumentar ligeramente la dificultad
+      const L = word.length;
+      for (let t=0; t<tries; t++){
+        const drdc = DIRS[Math.floor(Math.random()*DIRS.length)];
+        const dr = drdc[0], dc = drdc[1];
+        const r = Math.floor(Math.random()*n), c = Math.floor(Math.random()*n);
+        if (!canPlace(word, r, c, dr, dc, n)) continue;
+        const path = [];
+        for (let i=0;i<L;i++){
+          const rr = r + dr*i, cc = c + dc*i;
+          grid[rr][cc] = word[i];
+          path.push({r: rr, c: cc});
+        }
+        placedWords.push({ word, path });
+        return true;
+      }
+      // Fallback muy raro: colocar parcial al inicio si no encontró sitio
+      const path=[];
+      const rr = 0, cc = 0;
+      for (let i=0;i<Math.min(L, n); i++){
+        grid[rr][cc+i] = word[i]; path.push({r: rr, c: cc+i});
+      }
+      placedWords.push({ word: word.slice(0, Math.min(L,n)), path });
+      return false;
+    }
+
+    function renderBoard(){
+      board.innerHTML = '';
+      board.style.gridTemplateColumns = `repeat(${grid.length}, minmax(0,1fr))`;
+      for (let r=0; r<grid.length; r++){
+        for (let c=0; c<grid.length; c++){
+          const div = document.createElement('div');
+          div.className = 'cell';
+          div.textContent = grid[r][c];
+          div.dataset.r = r; div.dataset.c = c;
+          board.appendChild(div);
+        }
+      }
+      attachInteractions();
+      updateStats();
+    }
+
+    function renderList(){
+      list.innerHTML = '';
+      for (const {word} of placedWords){
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        chip.dataset.word = word;
+        chip.innerHTML = `<span>${word}</span><span>🔎</span>`;
+        list.appendChild(chip);
+      }
+      totalEl.textContent = placedWords.length;
+      foundEl.textContent = '0';
+    }
+
+    function updateStats(){
+      foundEl.textContent = foundSet.size.toString();
+      totalEl.textContent = placedWords.length.toString();
+    }
+
+    function clearPreview(){
+      board.querySelectorAll('.cell.preview, .cell.active').forEach(el=>{
+        el.classList.remove('preview','active');
+      });
+    }
+
+    function markFound(path){
+      for (const {r,c} of path){
+        const idx = r*grid.length + c;
+        const el = board.children[idx];
+        el.classList.add('found');
+      }
+    }
+
+    function getCellFromEvent(e){
+      const touch = e.touches && e.touches[0];
+      const target = (touch ? document.elementFromPoint(touch.clientX, touch.clientY) : e.target);
+      if (!target || !target.classList.contains('cell')) return null;
+      return target;
+    }
+
+    function attachInteractions(){
+      // Pointer (mouse + touch)
+      const begin = (e)=>{
+        const cell = getCellFromEvent(e);
+        if (!cell) return;
+        selecting = true; currentPath = [];
+        startCell = cell;
+        cell.classList.add('active');
+        currentPath = [{ r: +cell.dataset.r, c: +cell.dataset.c }];
+      };
+      const move = (e)=>{
+        if (!selecting) return;
+        const cell = getCellFromEvent(e);
+        if (!cell) return;
+        clearPreview();
+        // Calcular línea desde startCell hasta cell en la dirección más cercana válida
+        const r0 = +startCell.dataset.r, c0 = +startCell.dataset.c;
+        const r1 = +cell.dataset.r, c1 = +cell.dataset.c;
+        const dr = Math.sign(r1 - r0), dc = Math.sign(c1 - c0);
+        // Si no está en línea recta/diagonal, no previsualizamos
+        if (!((r0===r1) || (c0===c1) || (Math.abs(r1-r0)===Math.abs(c1-c0)))) return;
+        const path=[]; let rr=r0, cc=c0;
+        while (true){
+          const idx = rr*grid.length + cc; const el = board.children[idx];
+          el.classList.add('preview');
+          path.push({r:rr,c:cc});
+          if (rr===r1 && cc===c1) break;
+          rr+=dr; cc+=dc;
+        }
+        currentPath = path;
+      };
+      const end = ()=>{
+        if (!selecting) return;
+        selecting = false;
+        if (currentPath.length>0){
+          const attempt = currentPath.map(p=>grid[p.r][p.c]).join('');
+          const rev = attempt.split('').reverse().join('');
+          const hit = placedWords.find(w => !foundSet.has(w.word) && (w.word===attempt || w.word===rev) && samePath(w.path, currentPath));
+          if (hit){
+            foundSet.add(hit.word);
+            markFound(hit.path);
+            // marcar chip
+            const chip = list.querySelector(`[data-word="${hit.word}"]`);
+            if (chip) chip.classList.add('done');
+            updateStats();
+            // ¿ganaste?
+            if (foundSet.size === placedWords.length){
+              // === ADICIÓN: animación de victoria en todas las celdas ===
+              board.querySelectorAll('.cell').forEach(el=>{
+                el.classList.add('victory');
+                setTimeout(()=> el.classList.remove('victory'), 500);
+              });
+              setTimeout(()=> alert(`🎉 ¡Completado en ${timeEl.textContent}!`), 550);
+            }
+          } else {
+            // === ADICIÓN: animación de error en la selección ===
+            currentPath.forEach(({r,c})=>{
+              const idx = r*grid.length + c;
+              const el = board.children[idx];
+              el.classList.add('error');
+              setTimeout(()=> el.classList.remove('error'), 400);
+            });
+          }
+        }
+        clearPreview();
+      };
+
+      board.addEventListener('mousedown', begin);
+      board.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', end);
+
+      board.addEventListener('touchstart', (e)=>{ e.preventDefault(); begin(e); }, {passive:false});
+      board.addEventListener('touchmove', (e)=>{ e.preventDefault(); move(e); }, {passive:false});
+      board.addEventListener('touchend', (e)=>{ e.preventDefault(); end(e); }, {passive:false});
+    }
+
+    function samePath(a,b){
+      if (a.length !== b.length) return false;
+      const forward = a.every((p,i)=> p.r===b[i].r && p.c===b[i].c);
+      if (forward) return true;
+      const L=a.length; return a.every((p,i)=> p.r===b[L-1-i].r && p.c===b[L-1-i].c);
+    }
+
+    // Iniciar juego
+    newGame();
+  </script>
+</body>
+</html>
